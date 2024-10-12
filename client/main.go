@@ -20,7 +20,6 @@ const (
 type syncWriter struct {
 	m      sync.Mutex
 	writer io.Writer
-	wg     sync.WaitGroup
 }
 
 func (w *syncWriter) Write(b []byte) (n int, err error) {
@@ -60,11 +59,11 @@ func worker() {
 		log.Fatalf("Unable to create file: %v", err)
 	}
 	defer file.Close()
-	wr := &syncWriter{sync.Mutex{}, file, sync.WaitGroup{}}
-
+	wr := &syncWriter{sync.Mutex{}, file}
+	var wg sync.WaitGroup
 	read, write := io.Pipe()
 
-	wr.wg.Add(1)
+	wg.Add(1)
 	// чтение из response
 	go func() {
 		defer write.Close()
@@ -78,9 +77,9 @@ func worker() {
 	}()
 	// запись в файл
 	go func() {
-		defer wr.wg.Done()
+		defer wg.Done()
 		io.Copy(wr, read)
 	}()
 	//wait group
-	wr.wg.Wait()
+	wg.Wait()
 }
