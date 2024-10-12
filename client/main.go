@@ -17,20 +17,21 @@ const (
 	filename = "file.txt"
 )
 
-type SyncWriter struct {
+type syncWriter struct {
 	m      sync.Mutex
-	Writer io.Writer
+	writer io.Writer
+	wg     sync.WaitGroup
 }
 
-func (w *SyncWriter) Write(b []byte) (n int, err error) {
+func (w *syncWriter) Write(b []byte) (n int, err error) {
 	w.m.Lock()
 	defer w.m.Unlock()
-	return w.Writer.Write(b)
+	return w.writer.Write(b)
 }
 
 func main() {
 
-	engine := html.New("./public", ".html")
+	engine := html.New("./views", ".html")
 
 	app := fiber.New(fiber.Config{
 		Views: engine,
@@ -44,7 +45,7 @@ func main() {
 	})
 
 	app.Get("/message", func(c *fiber.Ctx) error {
-		go Worker()
+		go worker()
 		return nil
 	})
 
@@ -52,15 +53,19 @@ func main() {
 
 }
 
-func Worker() {
+func worker() {
+
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		log.Fatalf("Unable to create file: %v", err)
 	}
 	defer file.Close()
-	wr := &SyncWriter{sync.Mutex{}, file}
+	wr := &syncWriter{sync.Mutex{}, file, sync.WaitGroup{}}
+
 	read, write := io.Pipe()
 
+	wr.wg.Add(1)
+	// чтение из response
 	go func() {
 		defer write.Close()
 		resp, err := http.Get(url)
@@ -71,7 +76,11 @@ func Worker() {
 		io.Copy(write, resp.Body)
 
 	}()
-
-	io.Copy(wr, read)
-
+	// запись в файл
+	go func() {
+		defer wr.wg.Done()
+		io.Copy(wr, read)
+	}()
+	//wait group
+	wr.wg.Wait()
 }

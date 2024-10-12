@@ -13,9 +13,9 @@ import (
 const (
 	host     = "localhost"
 	port     = 5432
-	user     = "admin"
-	password = "12345"
-	dbname   = "ginblog"
+	user     = "postgres"
+	password = "postgres"
+	dbname   = "postgres"
 )
 
 var DB *gorm.DB
@@ -47,7 +47,7 @@ func FakerItems(connDB *gorm.DB, countRow int) {
 		return
 	}
 
-	for i := 0; i <=countRow; i++ {
+	for i := 0; i <= countRow; i++ {
 		connDB.Create(&models.Item{
 			Name:        faker.Lorem().Word(),
 			Description: faker.Lorem().Sentence(5),
